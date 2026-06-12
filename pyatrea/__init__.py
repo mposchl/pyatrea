@@ -521,11 +521,28 @@ class Atrea:
             return False
         power -= 1
 
-        if power < 12 or power > 100:
+        # Duplex units (H10510 in {0,1,3}): power is percentage 12-100, 0 = off.
+        # R_5 units (H10510=4): discrete values per RD5 spec tab.4:
+        #   0 = Off
+        #   10/11/12 = Ventilation Min/Norm/Max
+        #   20/21/22 = Circulation Min/Norm/Max
+        #   30..38 = Circulation+Ventilation 9 combinations (Min/Min .. Max/Max)
+        valid_duplex = 12 <= power <= 100
+        valid_r5 = (
+            power == 0
+            or 10 <= power <= 12
+            or 20 <= power <= 22
+            or 30 <= power <= 38
+        )
+        if not (valid_duplex or valid_r5):
             return False
 
         self.setCommand("H10708", power)
-        self.setCommand("H01020", power)
+        # H01020 is a legacy mirror used by Duplex web UI; only write it when
+        # the value is in the Duplex percentage range to avoid corrupting it
+        # on R_5 units (where 10/20/30 etc. would be misinterpreted as %).
+        if valid_duplex:
+            self.setCommand("H01020", power)
         return True
 
     def exec(self):
